@@ -61,6 +61,7 @@ public class RNTusClientModule extends ReactContextBaseJavaModule {
         String endpoint = options.getString("endpoint");
         Map<String, Object> rawHeaders = options.getMap("headers").toHashMap();
         Map<String, Object> rawMetadata = options.getMap("metadata").toHashMap();
+        Map<String, Object> rawData = options.getMap("data").toHashMap();
 
         Map<String, String> metadata = new HashMap<>();
         for (String key : rawMetadata.keySet()) {
@@ -70,13 +71,17 @@ public class RNTusClientModule extends ReactContextBaseJavaModule {
         for (String key : rawHeaders.keySet()) {
             headers.put(key, String.valueOf(rawHeaders.get(key)));
         }
+        Map<String, String> data = new HashMap<>();
+        for (String key : rawData.keySet()) {
+            data.put(key, String.valueOf(rawData.get(key)));
+        }
 
         File file = new File(fileUrl);
         TusUpload upload = null;
         try {
             upload = new TusUpload(file);
             String uploadId = UUID.randomUUID().toString();
-            TusRunnable executor = new TusRunnable(fileUrl, uploadId, endpoint, metadata, headers);
+            TusRunnable executor = new TusRunnable(fileUrl, uploadId, endpoint, metadata, headers,data);
             this.executorsMap.put(uploadId, executor);
             callback.invoke(uploadId);
         } catch (FileNotFoundException | MalformedURLException e) {
@@ -115,12 +120,15 @@ public class RNTusClientModule extends ReactContextBaseJavaModule {
         private TusClient client;
         private boolean shouldFinish;
         private boolean isRunning;
+        private Map<String, String> data;
 
+//headers.get("phrase_enc_key")
         public TusRunnable(String fileUrl,
                            String uploadId,
                            String endpoint,
                            Map<String, String> metadata,
-                           Map<String, String> headers
+                           Map<String, String> headers,
+                           Map<String, String> data
         ) throws FileNotFoundException, MalformedURLException {
             this.uploadId = uploadId;
             client = new TusClient();
@@ -134,12 +142,13 @@ public class RNTusClientModule extends ReactContextBaseJavaModule {
             upload.setMetadata(metadata);
             shouldFinish = false;
             isRunning = false;
+            this.data = data;
         }
 
         protected void makeAttempt() throws ProtocolException, IOException {
             uploader = client.resumeOrCreateUpload(upload);
-            uploader.setChunkSize(1024);
-            uploader.setRequestPayloadSize(10 * 1024 * 1024);
+            uploader.setChunkSize(5 * 1024 * 1024);
+            uploader.setRequestPayloadSize(5 * 1024 * 1024);
 
             do {
                 long totalBytes = upload.getSize();
@@ -156,7 +165,7 @@ public class RNTusClientModule extends ReactContextBaseJavaModule {
         }
 
         public boolean checkChunk() throws IOException, ProtocolException {
-            int remainingChunk = uploader.uploadChunk();
+            int remainingChunk = uploader.uploadChunk(data);
             if (remainingChunk > -1) {
                 return true;
             } else {

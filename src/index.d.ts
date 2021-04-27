@@ -29,6 +29,11 @@ interface Options {
      * A function called when the upload finished successfully.
      */
     onSuccess?(): void;
+
+    /**
+     * Any Additional data.
+     */
+    data?: object; 
 }
 
 /** Class representing a tus upload */
